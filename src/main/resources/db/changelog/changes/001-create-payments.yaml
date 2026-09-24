@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-payments
+      author: obvly
+      changes:
+        - createTable:
+            tableName: payments
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_payments
+                    nullable: false
+
+              - column:
+                  name: order_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: amount
+                  type: numeric(19, 2)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: currency
+                  type: varchar(3)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: description
+                  type: varchar(500)
+
+              - column:
+                  name: status
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false

@@ -1,0 +1,42 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-audit-events
+      author: obvly
+      changes:
+        - createTable:
+            tableName: audit_events
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_audit_events
+                    nullable: false
+              - column:
+                  name: event_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_audit_events_event_id
+              - column:
+                  name: payment_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: event_type
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: occurred_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false

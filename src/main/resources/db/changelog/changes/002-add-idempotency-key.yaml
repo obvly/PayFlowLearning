@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-add-idempotency-key
+      author: obvly
+      changes:
+        - addColumn:
+            tableName: payments
+            columns:
+              - column:
+                  name: idempotency_key
+                  type: varchar(100)
+
+        - addUniqueConstraint:
+            tableName: payments
+            columnNames: idempotency_key
+            constraintName: uk_payments_idempotency
