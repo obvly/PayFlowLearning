@@ -41,6 +41,11 @@ start the payment service first and disable its embedded consumer as well.
 The standalone audit endpoint is on port 8081. The embedded endpoint on port 8080
 remains present for compatibility and reads the same audit table in Compose.
 
+![PayFlowLearning architecture](docs/architecture.svg)
+
+The diagram is intentionally small: it shows the main request and event path without
+trying to present the project as a production payment platform.
+
 ## Technologies
 
 - Java 21, Spring Boot 3.3.4, Spring MVC, Spring Data JPA and Hibernate
