@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 20
     env:
       DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_RYUK_DISABLED: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
