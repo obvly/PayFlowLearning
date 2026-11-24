@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -137,10 +138,10 @@ class PaymentServiceTest {
         );
 
         when(paymentRepository.findByIdempotencyKey(idempotencyKey))
-                .thenReturn(Optional.empty());
-
-        when(paymentRepository.save(any(Payment.class)))
-                .thenReturn(payment);
+                .thenReturn(Optional.empty(), Optional.of(payment));
+        when(paymentRepository.insertIfAbsent(
+                any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
 
         Payment result = paymentService.createPayment(
                 "ORD-301",
@@ -152,8 +153,10 @@ class PaymentServiceTest {
 
         assertThat(result).isSameAs(payment);
 
-        verify(paymentRepository).findByIdempotencyKey(idempotencyKey);
-        verify(paymentRepository).save(any(Payment.class));
+        verify(paymentRepository, times(2))
+                .findByIdempotencyKey(idempotencyKey);
+        verify(paymentRepository).insertIfAbsent(
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test
