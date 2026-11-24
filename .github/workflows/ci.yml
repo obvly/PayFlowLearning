@@ -10,6 +10,8 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DOCKER_HOST: unix:///var/run/docker.sock
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,6 +22,16 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+
+      - name: Wait for Docker daemon
+        run: |
+          for attempt in {1..30}; do
+            if docker info >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker info
 
       - name: Verify both services including PostgreSQL integration tests
         run: make verify
