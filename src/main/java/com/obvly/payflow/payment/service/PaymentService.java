@@ -47,19 +47,26 @@ public class PaymentService {
             String idempotencyKey
     ) {
         if (idempotencyKey != null) {
-            Optional<Payment> existingPayment = paymentRepository
+            Optional<Payment> existing = paymentRepository
                     .findByIdempotencyKey(idempotencyKey);
-
-            if (existingPayment.isPresent()) {
-                Payment existing = existingPayment.get();
-                if (!Objects.equals(existing.getOrderId(), orderId)
-                        || existing.getAmount().compareTo(amount) != 0
-                        || !Objects.equals(existing.getCurrency(), currency)
-                        || !Objects.equals(existing.getDescription(), description)) {
-                    throw new IdempotencyConflictException();
-                }
-                return existing;
+            if (existing.isPresent()) {
+                validateIdempotencyRequest(existing.get(), orderId, amount,
+                        currency, description);
+                return existing.get();
             }
+
+            UUID paymentId = UUID.randomUUID();
+            int inserted = paymentRepository.insertIfAbsent(
+                    paymentId, orderId, amount, currency, description,
+                    idempotencyKey);
+            Payment payment = paymentRepository.findByIdempotencyKey(idempotencyKey)
+                    .orElseThrow();
+            validateIdempotencyRequest(payment, orderId, amount, currency,
+                    description);
+            if (inserted == 1) {
+                paymentEventPublisher.publish(payment);
+            }
+            return payment;
         }
 
         Payment payment = new Payment(
@@ -83,6 +90,18 @@ public class PaymentService {
             String description
     ) {
         return createPayment(orderId, amount, currency, description, null);
+    }
+
+    private void validateIdempotencyRequest(
+            Payment existing, String orderId, BigDecimal amount,
+            String currency, String description
+    ) {
+        if (!Objects.equals(existing.getOrderId(), orderId)
+                || existing.getAmount().compareTo(amount) != 0
+                || !Objects.equals(existing.getCurrency(), currency)
+                || !Objects.equals(existing.getDescription(), description)) {
+            throw new IdempotencyConflictException();
+        }
     }
 
     @Transactional(readOnly = true)

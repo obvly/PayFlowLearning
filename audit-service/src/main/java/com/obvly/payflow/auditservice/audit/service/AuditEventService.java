@@ -22,19 +22,10 @@ public class AuditEventService {
 
     @Transactional
     public void save(PaymentEvent paymentEvent) {
-        if (auditEventRepository.existsByEventId(paymentEvent.eventId())) {
-            return;
-        }
-
-        AuditEvent auditEvent = new AuditEvent(
-                paymentEvent.eventId(),
-                paymentEvent.paymentId(),
+        auditEventRepository.insertIfAbsent(
+                UUID.randomUUID(), paymentEvent.eventId(), paymentEvent.paymentId(),
                 "PAYMENT_" + paymentEvent.status().name(),
-                paymentEvent.status().name(),
-                paymentEvent.occurredAt()
-        );
-
-        auditEventRepository.save(auditEvent);
+                paymentEvent.status().name(), paymentEvent.occurredAt());
     }
 
     @Transactional(readOnly = true)

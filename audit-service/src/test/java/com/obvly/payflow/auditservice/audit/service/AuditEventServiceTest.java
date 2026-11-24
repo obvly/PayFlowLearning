@@ -1,9 +1,8 @@
 package com.obvly.payflow.auditservice.audit.service;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.obvly.payflow.auditservice.audit.repository.AuditEventRepository;
 import com.obvly.payflow.auditservice.payment.event.PaymentEvent;
@@ -39,11 +38,11 @@ class AuditEventServiceTest {
                 Instant.now()
         );
 
-        when(auditEventRepository.existsByEventId(eventId)).thenReturn(false);
-
         auditEventService.save(event);
 
-        verify(auditEventRepository).save(any());
+        verify(auditEventRepository).insertIfAbsent(
+                any(), eq(eventId), eq(event.paymentId()), any(), any(),
+                eq(event.occurredAt()));
     }
 
     @Test
@@ -59,10 +58,10 @@ class AuditEventServiceTest {
                 Instant.now()
         );
 
-        when(auditEventRepository.existsByEventId(eventId)).thenReturn(true);
-
         auditEventService.save(event);
 
-        verify(auditEventRepository, never()).save(any());
+        verify(auditEventRepository).insertIfAbsent(
+                any(), eq(eventId), eq(event.paymentId()), any(), any(),
+                eq(event.occurredAt()));
     }
 }

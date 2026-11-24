@@ -7,6 +7,14 @@ import com.obvly.payflow.payment.model.Payment;
 import com.obvly.payflow.payment.repository.PaymentRepository;
 import com.obvly.payflow.payment.service.PaymentService;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -47,6 +55,11 @@ class PaymentIdempotencyIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
     }
 
+    @BeforeEach
+    void cleanDatabase() {
+        paymentRepository.deleteAll();
+    }
+
     @Test
     void shouldReturnSamePaymentForSameIdempotencyKey() {
         String idempotencyKey = "integration-key-001";
@@ -74,5 +87,46 @@ class PaymentIdempotencyIntegrationTest {
                         assertThat(payment.getId()).isEqualTo(first.getId()));
 
         assertThat(paymentRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldReturnSamePaymentForConcurrentRequests() throws Exception {
+        String idempotencyKey = "integration-concurrent-key-001";
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CyclicBarrier start = new CyclicBarrier(2);
+
+        try {
+            CompletableFuture<Payment> first = CompletableFuture.supplyAsync(
+                    () -> createPaymentAfter(start, idempotencyKey), executor);
+            CompletableFuture<Payment> second = CompletableFuture.supplyAsync(
+                    () -> createPaymentAfter(start, idempotencyKey), executor);
+
+            List<Payment> payments = CompletableFuture.allOf(first, second)
+                    .thenApply(ignored -> List.of(first.join(), second.join()))
+                    .get(30, TimeUnit.SECONDS);
+
+            UUID paymentId = payments.getFirst().getId();
+            assertThat(payments).allSatisfy(payment ->
+                    assertThat(payment.getId()).isEqualTo(paymentId));
+            assertThat(paymentRepository.count()).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private Payment createPayment(String idempotencyKey) {
+        return paymentService.createPayment(
+                "ORD-CONCURRENT-001", new BigDecimal("19.99"), "EUR",
+                "Concurrent integration test", idempotencyKey);
+    }
+
+    private Payment createPaymentAfter(
+            CyclicBarrier start, String idempotencyKey) {
+        try {
+            start.await(30, TimeUnit.SECONDS);
+            return createPayment(idempotencyKey);
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }

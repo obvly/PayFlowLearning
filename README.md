@@ -73,8 +73,8 @@ trying to present the project as a production payment platform.
   omitted/null description and empty description are distinct. Both creation and
   replay currently return HTTP `201`.
 - Reusing a key with different request data returns `409 IDEMPOTENCY_CONFLICT`.
-  A database unique constraint prevents duplicate keys, but simultaneous first
-  requests are not yet guaranteed to return the same successful response.
+  Concurrent first requests are serialized by an atomic PostgreSQL insert, so
+  they return the same payment and leave one row in the database.
 - State changes return `200`; a forbidden transition (including repeating an
   action) returns `409 INVALID_PAYMENT_STATE`. An unknown payment returns `404`.
 - Refunds are full, simulated refunds. Partial refunds and retries of failed
@@ -236,8 +236,8 @@ This is a learning implementation, not a production payment system.
    database transaction, without an outbox. An event can be sent before a rollback,
    or a committed payment can lack an audit event after a send failure. Add a
    transactional outbox, publisher retries and delivery tests.
-2. **Concurrency:** database uniqueness prevents duplicate idempotency keys, but
-   racing creation requests can still produce an error. State transitions have no
+2. **Concurrency:** idempotent creation handles racing requests through PostgreSQL,
+   returning one payment. State transitions have no
    optimistic/pessimistic lock, so concurrent commands can overwrite one another.
    Add concurrency handling and PostgreSQL integration tests for these cases.
 3. **Cache consistency:** Redis errors can fail API calls. Cache updates are not
