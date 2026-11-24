@@ -2,8 +2,12 @@ package com.obvly.payflow.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.obvly.payflow.audit.repository.AuditEventRepository;
+import com.obvly.payflow.audit.service.AuditEventService;
+import com.obvly.payflow.payment.event.PaymentEvent;
 import com.obvly.payflow.payment.event.PaymentEventPublisher;
 import com.obvly.payflow.payment.model.Payment;
+import com.obvly.payflow.payment.model.PaymentStatus;
 import com.obvly.payflow.payment.repository.PaymentRepository;
 import com.obvly.payflow.payment.service.PaymentService;
 import java.math.BigDecimal;
@@ -48,6 +52,12 @@ class PaymentIdempotencyIntegrationTest {
     @Autowired
     private PaymentRepository paymentRepository;
 
+    @Autowired
+    private AuditEventService auditEventService;
+
+    @Autowired
+    private AuditEventRepository auditEventRepository;
+
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
@@ -58,6 +68,7 @@ class PaymentIdempotencyIntegrationTest {
     @BeforeEach
     void cleanDatabase() {
         paymentRepository.deleteAll();
+        auditEventRepository.deleteAll();
     }
 
     @Test
@@ -125,6 +136,39 @@ class PaymentIdempotencyIntegrationTest {
         try {
             start.await(30, TimeUnit.SECONDS);
             return createPayment(idempotencyKey);
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    @Test
+    void shouldIgnoreConcurrentDuplicateAuditEvents() throws Exception {
+        PaymentEvent event = new PaymentEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "ORD-AUDIT-CONCURRENT",
+                new BigDecimal("25.00"), "EUR", PaymentStatus.COMPLETED,
+                java.time.Instant.now());
+        CyclicBarrier start = new CyclicBarrier(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            var first = executor.submit(() -> saveAuditAfter(start, event));
+            var second = executor.submit(() -> saveAuditAfter(start, event));
+            first.get(30, TimeUnit.SECONDS);
+            second.get(30, TimeUnit.SECONDS);
+
+            assertThat(auditEventRepository.findAll())
+                    .singleElement()
+                    .extracting(auditEvent -> auditEvent.getEventId())
+                    .isEqualTo(event.eventId());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private void saveAuditAfter(CyclicBarrier start, PaymentEvent event) {
+        try {
+            start.await(30, TimeUnit.SECONDS);
+            auditEventService.save(event);
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
         }
